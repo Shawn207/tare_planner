@@ -1,8 +1,9 @@
 # Sensor Coverage Planner Ground
 sub_start_exploration_topic_ : /start_exploration
-sub_terrain_map_topic_ : /terrain_map
+sub_terrain_map_topic_ : /dynamic_map/inflated_voxel_map
 sub_terrain_map_ext_topic_ : /terrain_map_ext
-sub_state_estimation_topic_ : /state_estimation_at_scan
+# sub_state_estimation_topic_ : /state_estimation_at_scan
+sub_state_estimation_topic_ : /CERLAB/quadcopter/odom
 sub_registered_scan_topic_ : /registered_scan
 sub_coverage_boundary_topic_ : /sensor_coverage_planner/coverage_boundary
 sub_viewpoint_boundary_topic_ : /navigation_boundary
@@ -25,7 +26,7 @@ kExtendWayPointDistanceSmall : 4.5
 kKeyposeCloudDwzFilterLeafSize : 0.2
 kRushHomeDist : 10
 kAtHomeDistThreshold : 0.5
-kTerrainCollisionThreshold : 0.5
+kTerrainCollisionThreshold : -1 #0.5
 kLookAheadDistance : 8
 kUseMomentum : false 
 kDirectionChangeCounterThr : 6

@@ -49,6 +49,7 @@
 #include "local_coverage_planner/local_coverage_planner.h"
 #include "tare_visualizer/tare_visualizer.h"
 #include "rolling_occupancy_grid/rolling_occupancy_grid.h"
+#include "flightBase/flightBase.h"
 
 #define cursup "\033[A"
 #define cursclean "\033[2K"
@@ -156,7 +157,7 @@ struct PlannerData
   void Initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_p);
 };
 
-class SensorCoveragePlanner3D
+class SensorCoveragePlanner3D : public flightBase
 {
 public:
   explicit SensorCoveragePlanner3D(ros::NodeHandle& nh, ros::NodeHandle& nh_p);
@@ -182,6 +183,7 @@ private:
   PlannerParameters pp_;
   PlannerData pd_;
   pointcloud_utils_ns::PointCloudDownsizer<pcl::PointXYZ> pointcloud_downsizer_;
+  trajData td_;
 
   int update_representation_runtime_;
   int local_viewpoint_sampling_runtime_;
@@ -198,7 +200,8 @@ private:
   ros::Time start_time_;
   ros::Time global_direction_switch_time_;
 
-  ros::Timer execution_timer_;
+  ros::Timer execution_timer_; // execute planner
+  ros::Timer trajExeTimer_; // execute trajectory by publishing target pose
 
   // ROS subscribers
   ros::Subscriber exploration_start_sub_;
@@ -234,6 +237,7 @@ private:
   void CoverageBoundaryCallback(const geometry_msgs::PolygonStampedConstPtr& polygon_msg);
   void ViewPointBoundaryCallback(const geometry_msgs::PolygonStampedConstPtr& polygon_msg);
   void NogoBoundaryCallback(const geometry_msgs::PolygonStampedConstPtr& polygon_msg);
+  void trajExeCallback(const ros::TimerEvent&);
 
   void SendInitialWaypoint();
   void UpdateKeyposeGraph();

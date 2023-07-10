@@ -9,7 +9,6 @@
  *
  */
 
-//
 #include "sensor_coverage_planner/sensor_coverage_planner_ground.h"
 #include "graph/graph.h"
 
@@ -20,10 +19,10 @@ bool PlannerParameters::ReadParameters(ros::NodeHandle& nh)
   sub_start_exploration_topic_ =
       misc_utils_ns::getParam<std::string>(nh, "sub_start_exploration_topic_", "/exploration_start");
   sub_state_estimation_topic_ =
-      misc_utils_ns::getParam<std::string>(nh, "sub_state_estimation_topic_", "/state_estimation_at_scan");
+      misc_utils_ns::getParam<std::string>(nh, "sub_state_estimation_topic_", "/CERLAB/quadcopter/odom");
   sub_registered_scan_topic_ =
       misc_utils_ns::getParam<std::string>(nh, "sub_registered_scan_topic_", "/registered_scan");
-  sub_terrain_map_topic_ = misc_utils_ns::getParam<std::string>(nh, "sub_terrain_map_topic_", "/terrain_map");
+  sub_terrain_map_topic_ = misc_utils_ns::getParam<std::string>(nh, "sub_terrain_map_topic_", "/dynamic_map/inflated_voxel_map");
   sub_terrain_map_ext_topic_ =
       misc_utils_ns::getParam<std::string>(nh, "sub_terrain_map_ext_topic_", "/terrain_map_ext");
   sub_coverage_boundary_topic_ =
@@ -155,7 +154,8 @@ void PlannerData::Initialize(ros::NodeHandle& nh, ros::NodeHandle& nh_p)
 }
 
 SensorCoveragePlanner3D::SensorCoveragePlanner3D(ros::NodeHandle& nh, ros::NodeHandle& nh_p)
-  : keypose_cloud_update_(false)
+  : flightBase(nh)
+  , keypose_cloud_update_(false)
   , initialized_(false)
   , lookahead_point_update_(false)
   , relocation_(false)
@@ -175,6 +175,7 @@ SensorCoveragePlanner3D::SensorCoveragePlanner3D(ros::NodeHandle& nh, ros::NodeH
   , direction_no_change_count_(0)
   , momentum_activation_count_(0)
 {
+  ROS_INFO("initialized planner");
   initialize(nh, nh_p);
   PrintExplorationStatus("Exploration Started", false);
 }
@@ -193,7 +194,10 @@ bool SensorCoveragePlanner3D::initialize(ros::NodeHandle& nh, ros::NodeHandle& n
 
   lidar_model_ns::LiDARModel::setCloudDWZResol(pd_.planning_env_->GetPlannerCloudResolution());
 
+  // planner timer
   execution_timer_ = nh.createTimer(ros::Duration(1.0), &SensorCoveragePlanner3D::execute, this);
+  // trajectory execution timer
+	trajExeTimer_ = this->nh_.createTimer(ros::Duration(0.2), &SensorCoveragePlanner3D::trajExeCallback, this);
 
   exploration_start_sub_ =
       nh.subscribe(pp_.sub_start_exploration_topic_, 5, &SensorCoveragePlanner3D::ExplorationStartCallback, this);
@@ -228,6 +232,17 @@ bool SensorCoveragePlanner3D::initialize(ros::NodeHandle& nh, ros::NodeHandle& n
 
   return true;
 }
+void SensorCoveragePlanner3D::trajExeCallback(const ros::TimerEvent&){
+  if (not this->td_.init){
+    return;
+  }
+
+  for (size_t i=0 ; i<this->td_.trajectory.poses.size() ; ++i ){
+    this->updateTarget(this->td_.trajectory.poses[i]);
+  }
+  this->goalReceived_ = false;
+
+}
 
 void SensorCoveragePlanner3D::ExplorationStartCallback(const std_msgs::Bool::ConstPtr& start_msg)
 {
@@ -239,6 +254,8 @@ void SensorCoveragePlanner3D::ExplorationStartCallback(const std_msgs::Bool::Con
 
 void SensorCoveragePlanner3D::StateEstimationCallback(const nav_msgs::Odometry::ConstPtr& state_estimation_msg)
 {
+  this->odom_ = *state_estimation_msg;
+  this->setOdomReceived(true);
   pd_.robot_position_ = state_estimation_msg->pose.pose.position;
   // Todo: use a boolean
   if (std::abs(pd_.initial_position_.x()) < 0.01 && std::abs(pd_.initial_position_.y()) < 0.01 &&
@@ -263,6 +280,7 @@ void SensorCoveragePlanner3D::StateEstimationCallback(const nav_msgs::Odometry::
     pd_.moving_forward_ = false;
   }
   initialized_ = true;
+  // std::cout<< pd_.robot_position_.x << " " <<pd_.robot_position_.y<<" "<<pd_.robot_position_.z << " " << pd_.robot_yaw_ <<std::endl;
 }
 
 void SensorCoveragePlanner3D::RegisteredScanCallback(const sensor_msgs::PointCloud2ConstPtr& registered_scan_msg)
@@ -314,8 +332,10 @@ void SensorCoveragePlanner3D::TerrainMapCallback(const sensor_msgs::PointCloud2C
     pd_.terrain_collision_cloud_->cloud_->clear();
     for (auto& point : terrain_map_tmp->points)
     {
+      // std::cout << "point: " << point.x << " " << point.y << " " << point.z << " " << point.intensity << " " << std::endl;
       if (point.intensity > pp_.kTerrainCollisionThreshold)
       {
+        // std::cout << point.intensity << " > " << pp_.kTerrainCollisionThreshold << std::endl;
         pd_.terrain_collision_cloud_->cloud_->points.push_back(point);
       }
     }
@@ -1239,6 +1259,10 @@ void SensorCoveragePlanner3D::execute(const ros::TimerEvent&)
     ROS_INFO("Waiting for start signal");
     return;
   }
+
+  // take off
+  this->takeoff();
+
   Timer overall_processing_timer("overall processing");
   update_representation_runtime_ = 0;
   local_viewpoint_sampling_runtime_ = 0;
@@ -1322,6 +1346,13 @@ void SensorCoveragePlanner3D::execute(const ros::TimerEvent&)
 
     pd_.exploration_path_ = ConcatenateGlobalLocalPath(global_path, local_path);
 
+    // updateTrajectory
+    this->td_.updateTrajectory(pd_.exploration_path_.GetPath());
+    // this->updateTrajectory(pd_.exploration_path_->getPath());
+    // for (size_t i=0 ; i<this->trajectory.poses.size() ; ++i ){
+    //   this->updateTarget(this->trajectory[i]);
+    // }
+
     PublishExplorationState();
 
     lookahead_point_update_ = GetLookAheadPoint(pd_.exploration_path_, global_path, pd_.lookahead_point_);
@@ -1340,4 +1371,5 @@ void SensorCoveragePlanner3D::execute(const ros::TimerEvent&)
     PublishRuntime();
   }
 }
+
 }  // namespace sensor_coverage_planner_3d_ns

@@ -20,6 +20,8 @@ namespace sensor_coverage_planner_3d_ns{
     	this->mavrosStateReceived_ = true; // original true
 
     	// pose publisher
+    	this->odomReceived_ = false;
+    	this->mavrosStateReceived_ = true; // original true
     	if (not this->nh_.getParam("sample_time", this->sampleTime_)){
     		this->sampleTime_ = 0.1;
     		ROS_INFO("No sample time param. Use default: 0.1s.");
@@ -147,6 +149,7 @@ namespace sensor_coverage_planner_3d_ns{
 		else if (testMode == "eight"){
 
 		}
+
 		else{
 			ROS_INFO("Cannot find your test mode!");
 		}

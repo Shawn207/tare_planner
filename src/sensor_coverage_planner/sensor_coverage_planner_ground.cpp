@@ -328,7 +328,10 @@ void SensorCoveragePlanner3D::TerrainMapCallback(const sensor_msgs::PointCloud2C
   if (pp_.kCheckTerrainCollision)
   {
     pcl::PointCloud<pcl::PointXYZI>::Ptr terrain_map_tmp(new pcl::PointCloud<pcl::PointXYZI>());
+    // ROS_INFO("before ros");
     pcl::fromROSMsg<pcl::PointXYZI>(*terrain_map_msg, *terrain_map_tmp);
+    // ROS_INFO("after ros");
+    // ROS_INFO("                       ");
     pd_.terrain_collision_cloud_->cloud_->clear();
     for (auto& point : terrain_map_tmp->points)
     {

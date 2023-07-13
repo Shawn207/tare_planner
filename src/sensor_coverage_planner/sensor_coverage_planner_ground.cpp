@@ -21,7 +21,7 @@ bool PlannerParameters::ReadParameters(ros::NodeHandle& nh)
   sub_state_estimation_topic_ =
       misc_utils_ns::getParam<std::string>(nh, "sub_state_estimation_topic_", "/CERLAB/quadcopter/odom");
   sub_registered_scan_topic_ =
-      misc_utils_ns::getParam<std::string>(nh, "sub_registered_scan_topic_", "/registered_scan");
+      misc_utils_ns::getParam<std::string>(nh, "sub_registered_scan_topic_", "/dynamic_map/depth_cloud");
   sub_terrain_map_topic_ = misc_utils_ns::getParam<std::string>(nh, "sub_terrain_map_topic_", "/dynamic_map/inflated_voxel_map");
   sub_terrain_map_ext_topic_ =
       misc_utils_ns::getParam<std::string>(nh, "sub_terrain_map_ext_topic_", "/terrain_map_ext");
@@ -194,11 +194,6 @@ bool SensorCoveragePlanner3D::initialize(ros::NodeHandle& nh, ros::NodeHandle& n
 
   lidar_model_ns::LiDARModel::setCloudDWZResol(pd_.planning_env_->GetPlannerCloudResolution());
 
-  // planner timer
-  execution_timer_ = nh.createTimer(ros::Duration(1.0), &SensorCoveragePlanner3D::execute, this);
-  // trajectory execution timer
-	trajExeTimer_ = this->nh_.createTimer(ros::Duration(0.2), &SensorCoveragePlanner3D::trajExeCallback, this);
-
   exploration_start_sub_ =
       nh.subscribe(pp_.sub_start_exploration_topic_, 5, &SensorCoveragePlanner3D::ExplorationStartCallback, this);
   registered_scan_sub_ =
@@ -229,6 +224,13 @@ bool SensorCoveragePlanner3D::initialize(ros::NodeHandle& nh, ros::NodeHandle& n
   // Debug
   pointcloud_manager_neighbor_cells_origin_pub_ =
       nh.advertise<geometry_msgs::PointStamped>("pointcloud_manager_neighbor_cells_origin", 1);
+
+  // planner timer
+  execution_timer_ = nh.createTimer(ros::Duration(1.0), &SensorCoveragePlanner3D::execute, this);
+  // trajectory execution timer
+	trajExeTimer_ = this->nh_.createTimer(ros::Duration(0.2), &SensorCoveragePlanner3D::trajExeCallback, this);
+
+  this->takeoff();
 
   return true;
 }
@@ -285,14 +287,17 @@ void SensorCoveragePlanner3D::StateEstimationCallback(const nav_msgs::Odometry::
 
 void SensorCoveragePlanner3D::RegisteredScanCallback(const sensor_msgs::PointCloud2ConstPtr& registered_scan_msg)
 {
+  ROS_INFO("in registered scan cb");
   if (!initialized_)
   {
+    ROS_INFO("not initialized!");
     return;
   }
   pcl::PointCloud<pcl::PointXYZ>::Ptr registered_scan_tmp(new pcl::PointCloud<pcl::PointXYZ>());
   pcl::fromROSMsg(*registered_scan_msg, *registered_scan_tmp);
   if (registered_scan_tmp->points.empty())
   {
+    ROS_INFO("registered_scan_tmp->pionts is empty");
     return;
   }
   *(pd_.registered_scan_stack_->cloud_) += *(registered_scan_tmp);
@@ -305,8 +310,10 @@ void SensorCoveragePlanner3D::RegisteredScanCallback(const sensor_msgs::PointClo
   pd_.planning_env_->UpdateRegisteredCloud<pcl::PointXYZI>(pd_.registered_cloud_->cloud_);
 
   registered_cloud_count_ = (registered_cloud_count_ + 1) % 5;
+  std::cout << "registred cloud count is: " << registered_cloud_count_ << std::endl;
   if (registered_cloud_count_ == 0)
   {
+
     // initialized_ = true;
     pd_.keypose_.pose.pose.position = pd_.robot_position_;
     pd_.keypose_.pose.covariance[0] = keypose_count_++;
@@ -1263,8 +1270,8 @@ void SensorCoveragePlanner3D::execute(const ros::TimerEvent&)
     return;
   }
 
-  // take off
-  this->takeoff();
+  // // take off
+  // this->takeoff();
 
   Timer overall_processing_timer("overall processing");
   update_representation_runtime_ = 0;
@@ -1283,8 +1290,10 @@ void SensorCoveragePlanner3D::execute(const ros::TimerEvent&)
   }
 
   overall_processing_timer.Start();
+  ROS_INFO("before if");
   if (keypose_cloud_update_)
   {
+    ROS_INFO("in if");
     keypose_cloud_update_ = false;
 
     CountDirectionChange();

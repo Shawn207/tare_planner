@@ -180,6 +180,7 @@ private:
   bool step_;
   bool use_momentum_;
   bool lookahead_point_in_line_of_sight_;
+  bool replan_;
   PlannerParameters pp_;
   PlannerData pd_;
   pointcloud_utils_ns::PointCloudDownsizer<pcl::PointXYZ> pointcloud_downsizer_;
@@ -198,10 +199,12 @@ private:
   int momentum_activation_count_;
 
   ros::Time start_time_;
+  ros::Time replan_start_time_;
   ros::Time global_direction_switch_time_;
 
   ros::Timer execution_timer_; // execute planner
   ros::Timer trajExeTimer_; // execute trajectory by publishing target pose
+  ros::Timer visTimer_;
 
   // ROS subscribers
   ros::Subscriber exploration_start_sub_;
@@ -225,6 +228,7 @@ private:
   ros::Publisher runtime_breakdown_pub_;
   ros::Publisher runtime_pub_;
   ros::Publisher momentum_activation_count_pub_;
+  ros::Publisher traj_marker_pub_;
   // Debug
   ros::Publisher pointcloud_manager_neighbor_cells_origin_pub_;
 
@@ -238,6 +242,7 @@ private:
   void ViewPointBoundaryCallback(const geometry_msgs::PolygonStampedConstPtr& polygon_msg);
   void NogoBoundaryCallback(const geometry_msgs::PolygonStampedConstPtr& polygon_msg);
   void trajExeCallback(const ros::TimerEvent&);
+  void visTimerCallback(const ros::TimerEvent&);
 
   void SendInitialWaypoint();
   void UpdateKeyposeGraph();

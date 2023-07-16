@@ -553,6 +553,7 @@ void GridWorld::UpdateCellStatus(const std::shared_ptr<viewpoint_manager_ns::Vie
       covered_count++;
     }
   }
+  // std::cout << exploring_count <<" "<< unseen_count << " "<<covered_count << " "<<std::endl;
 
   for (const auto& cell_ind : neighbor_cell_indices_)
   {
@@ -607,6 +608,7 @@ void GridWorld::UpdateCellStatus(const std::shared_ptr<viewpoint_manager_ns::Vie
         highest_score = score;
         highest_score_viewpoint_ind = viewpoint_ind;
       }
+      // std::cout << score <<" "<< kMinAddPointNumSmall << " "<<kMinAddPointNumBig << " "<<std::endl;
       if (score > kMinAddPointNumSmall)
       {
         above_small_threshold_count++;
@@ -620,6 +622,7 @@ void GridWorld::UpdateCellStatus(const std::shared_ptr<viewpoint_manager_ns::Vie
         above_frontier_threshold_count++;
       }
     }
+    // std::cout << "==============="<<above_small_threshold_count << " " << above_big_threshold_count << " " << above_frontier_threshold_count << std::endl;
     // Exploring to Covered
     if (subspaces_->GetCell(cell_ind).GetStatus() == CellStatus::EXPLORING &&
         above_frontier_threshold_count < kCellExploringToCoveredThr &&

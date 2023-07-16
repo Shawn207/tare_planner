@@ -11,6 +11,8 @@
 
 #include "sensor_coverage_planner/sensor_coverage_planner_ground.h"
 #include "graph/graph.h"
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 
 namespace sensor_coverage_planner_3d_ns
 {
@@ -169,6 +171,7 @@ SensorCoveragePlanner3D::SensorCoveragePlanner3D(ros::NodeHandle& nh, ros::NodeH
   , step_(false)
   , use_momentum_(false)
   , lookahead_point_in_line_of_sight_(true)
+  , replan_(true)
   , registered_cloud_count_(0)
   , keypose_count_(0)
   , direction_change_count_(0)
@@ -220,6 +223,7 @@ bool SensorCoveragePlanner3D::initialize(ros::NodeHandle& nh, ros::NodeHandle& n
   exploration_finish_pub_ = nh.advertise<std_msgs::Bool>(pp_.pub_exploration_finish_topic_, 2);
   runtime_breakdown_pub_ = nh.advertise<std_msgs::Int32MultiArray>(pp_.pub_runtime_breakdown_topic_, 2);
   runtime_pub_ = nh.advertise<std_msgs::Float32>(pp_.pub_runtime_topic_, 2);
+  this->traj_marker_pub_ = nh.advertise<visualization_msgs::MarkerArray>("trajectory_markers", 10);
   momentum_activation_count_pub_ = nh.advertise<std_msgs::Int32>(pp_.pub_momentum_activation_count_topic_, 2);
   // Debug
   pointcloud_manager_neighbor_cells_origin_pub_ =
@@ -228,21 +232,61 @@ bool SensorCoveragePlanner3D::initialize(ros::NodeHandle& nh, ros::NodeHandle& n
   // planner timer
   execution_timer_ = nh.createTimer(ros::Duration(1.0), &SensorCoveragePlanner3D::execute, this);
   // trajectory execution timer
-	trajExeTimer_ = this->nh_.createTimer(ros::Duration(0.2), &SensorCoveragePlanner3D::trajExeCallback, this);
+	trajExeTimer_ = nh.createTimer(ros::Duration(0.2), &SensorCoveragePlanner3D::trajExeCallback, this);
+  visTimer_ = nh.createTimer(ros::Duration(0.03),&SensorCoveragePlanner3D::visTimerCallback, this);
 
   this->takeoff();
 
   return true;
 }
+
+void SensorCoveragePlanner3D::visTimerCallback(const ros::TimerEvent&){
+  visualization_msgs::Marker point;
+  visualization_msgs::MarkerArray points;
+  point.header.frame_id = "map";
+  point.header.stamp = ros::Time();
+  point.id = 0;
+  point.action = visualization_msgs::Marker::ADD;
+  point.pose.orientation.w = 1.0;
+  point.type = visualization_msgs::Marker::SPHERE;
+  point.scale.x = 0.5;
+  point.scale.y = 0.5;
+  point.scale.z = 0.5;
+  point.color.g = 1.0;
+  point.color.a = 1.0;
+  point.color.r = 0.;
+  point.color.b = 0.;
+  point.lifetime = ros::Duration(0.5);
+
+  for (size_t i=0 ; i<this->td_.trajectory.poses.size() ; ++i ){
+    point.pose.position.x = this->td_.trajectory.poses[i].pose.position.x;
+    point.pose.position.y = this->td_.trajectory.poses[i].pose.position.y;
+    point.pose.position.z = this->td_.trajectory.poses[i].pose.position.z;
+    points.markers.push_back(point);
+    point.id++;
+    
+  }
+  traj_marker_pub_.publish(points);
+  
+}
+
+
 void SensorCoveragePlanner3D::trajExeCallback(const ros::TimerEvent&){
   if (not this->td_.init){
     return;
   }
-
-  for (size_t i=0 ; i<this->td_.trajectory.poses.size() ; ++i ){
-    this->updateTarget(this->td_.trajectory.poses[i]);
+  ros::Time currTime = ros::Time::now();
+  if ((currTime-this->replan_start_time_).toSec() > 5){
+    if(this->isReach(this->td_.trajectory.poses.back(),false)){
+      this->replan_ = true;
+      ROS_INFO("replan needed");
+    }
   }
-  this->goalReceived_ = false;
+
+  // for (size_t i=0 ; i<this->td_.trajectory.poses.size() ; ++i ){
+  //   this->updateTarget(this->td_.trajectory.poses[i]);
+  // }
+  // this->goalReceived_ = false;
 
 }
 
@@ -287,7 +331,7 @@ void SensorCoveragePlanner3D::StateEstimationCallback(const nav_msgs::Odometry::
 
 void SensorCoveragePlanner3D::RegisteredScanCallback(const sensor_msgs::PointCloud2ConstPtr& registered_scan_msg)
 {
-  ROS_INFO("in registered scan cb");
+  // ROS_INFO("in registered scan cb");
   if (!initialized_)
   {
     ROS_INFO("not initialized!");
@@ -310,7 +354,7 @@ void SensorCoveragePlanner3D::RegisteredScanCallback(const sensor_msgs::PointClo
   pd_.planning_env_->UpdateRegisteredCloud<pcl::PointXYZI>(pd_.registered_cloud_->cloud_);
 
   registered_cloud_count_ = (registered_cloud_count_ + 1) % 5;
-  std::cout << "registred cloud count is: " << registered_cloud_count_ << std::endl;
+  // std::cout << "registred cloud count is: " << registered_cloud_count_ << std::endl;
   if (registered_cloud_count_ == 0)
   {
 
@@ -1270,6 +1314,11 @@ void SensorCoveragePlanner3D::execute(const ros::TimerEvent&)
     return;
   }
 
+  if (!this->replan_){
+    ROS_INFO("no new traj replan needed.");
+    return;
+  }
+  ROS_INFO("start planing a new trajectory");
   // // take off
   // this->takeoff();
 
@@ -1290,10 +1339,10 @@ void SensorCoveragePlanner3D::execute(const ros::TimerEvent&)
   }
 
   overall_processing_timer.Start();
-  ROS_INFO("before if");
+  // ROS_INFO("before if");
   if (keypose_cloud_update_)
   {
-    ROS_INFO("in if");
+    // ROS_INFO("in if");
     keypose_cloud_update_ = false;
 
     CountDirectionChange();
@@ -1302,15 +1351,17 @@ void SensorCoveragePlanner3D::execute(const ros::TimerEvent&)
     update_representation_timer.Start();
 
     // Update grid world
+    // ROS_INFO("updat global representation");
     UpdateGlobalRepresentation();
 
     int viewpoint_candidate_count = UpdateViewPoints();
+    // ROS_INFO("view pionts count: %i",viewpoint_candidate_count);
     if (viewpoint_candidate_count == 0)
     {
       ROS_WARN("Cannot get candidate viewpoints, skipping this round");
       return;
     }
-
+    // ROS_INFO("update keypose graph");
     UpdateKeyposeGraph();
 
     int uncovered_point_num = 0;
@@ -1358,12 +1409,24 @@ void SensorCoveragePlanner3D::execute(const ros::TimerEvent&)
 
     pd_.exploration_path_ = ConcatenateGlobalLocalPath(global_path, local_path);
 
+    this->replan_start_time_ = ros::Time::now();
+    
     // updateTrajectory
     this->td_.updateTrajectory(pd_.exploration_path_.GetPath());
-    // this->updateTrajectory(pd_.exploration_path_->getPath());
-    // for (size_t i=0 ; i<this->trajectory.poses.size() ; ++i ){
-    //   this->updateTarget(this->trajectory[i]);
+    ros::Rate r (3);
+    size_t i = 0;
+		while (ros::ok() and i<this->td_.trajectory.poses.size()){
+      std::cout << this->td_.trajectory.poses[i].pose.position.x << " " << this->td_.trajectory.poses[i].pose.position.y << std::endl;
+      this->td_.trajectory.poses[i].pose.orientation = this->odom_.pose.pose.orientation;
+			this->updateTarget(this->td_.trajectory.poses[i]);
+			r.sleep();
+      ++i;
+		}
+    std::cout << ' ' << std::endl;
+    // for (size_t i=0 ; i<this->td_.trajectory.poses.size() ; ++i ){
+    //   this->updateTarget(this->td_.trajectory.poses[i]);
     // }
+    this->replan_ = false;
 
     PublishExplorationState();
 

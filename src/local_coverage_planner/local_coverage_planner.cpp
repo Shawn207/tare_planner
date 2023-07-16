@@ -109,6 +109,7 @@ void LocalCoveragePlanner::EnqueueViewpointCandidates(std::vector<std::pair<int,
     if (viewpoint_manager_->ViewPointVisited(viewpoint_index) ||
         !viewpoint_manager_->ViewPointInExploringCell(viewpoint_index))
     {
+      // ROS_INFO("no exploring voxel when enqueue!");
       continue;
     }
     int viewpoint_array_index = viewpoint_manager_->GetViewPointArrayInd(viewpoint_index);

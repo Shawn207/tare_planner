@@ -1370,16 +1370,19 @@ void ViewPointManager::UpdateCandidateViewPointCellStatus(std::unique_ptr<grid_w
   for (const auto& ind : candidate_indices_)
   {
     int cell_ind = GetViewPointCellInd(ind);
+    // ROS_INFO("update cnadidate vp cell status!");
     if (grid_world->IndInBound(cell_ind))
     {
       grid_world_ns::CellStatus cell_status = grid_world->GetCellStatus(cell_ind);
       if (cell_status == grid_world_ns::CellStatus::UNSEEN || cell_status == grid_world_ns::CellStatus::EXPLORING)
       {
         SetViewPointInExploringCell(ind, true);
+        // ROS_INFO("set exploring true");
       }
       else
       {
         SetViewPointInExploringCell(ind, false);
+        // ROS_INFO("set exploring true");
       }
     }
     else

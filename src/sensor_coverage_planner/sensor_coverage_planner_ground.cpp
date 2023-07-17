@@ -1410,23 +1410,7 @@ void SensorCoveragePlanner3D::execute(const ros::TimerEvent&)
     pd_.exploration_path_ = ConcatenateGlobalLocalPath(global_path, local_path);
 
     this->replan_start_time_ = ros::Time::now();
-    
-    // updateTrajectory
-    this->td_.updateTrajectory(pd_.exploration_path_.GetPath());
-    ros::Rate r (3);
-    size_t i = 0;
-		while (ros::ok() and i<this->td_.trajectory.poses.size()){
-      std::cout << this->td_.trajectory.poses[i].pose.position.x << " " << this->td_.trajectory.poses[i].pose.position.y << std::endl;
-      this->td_.trajectory.poses[i].pose.orientation = this->odom_.pose.pose.orientation;
-			this->updateTarget(this->td_.trajectory.poses[i]);
-			r.sleep();
-      ++i;
-		}
-    std::cout << ' ' << std::endl;
-    // for (size_t i=0 ; i<this->td_.trajectory.poses.size() ; ++i ){
-    //   this->updateTarget(this->td_.trajectory.poses[i]);
-    // }
-    this->replan_ = false;
+  
 
     PublishExplorationState();
 
@@ -1444,6 +1428,37 @@ void SensorCoveragePlanner3D::execute(const ros::TimerEvent&)
     PublishLocalPlanningVisualization(local_path);
     PublishGlobalPlanningVisualization(global_path, local_path);
     PublishRuntime();
+
+    // updateTrajectory
+    this->td_.updateTrajectory(pd_.exploration_path_.GetPath());
+    ros::Rate r (10);
+    size_t i = 1;
+    geometry_msgs::PoseStamped lastWayPt;
+    geometry_msgs::PoseStamped newWayPt = this->td_.trajectory.poses[0];
+    geometry_msgs::PoseStamped currTarget;
+		while (i<this->td_.trajectory.poses.size()){
+      // std::cout << this->td_.trajectory.poses[i].pose.position.x << " " << this->td_.trajectory.poses[i].pose.position.y << std::endl;
+      lastWayPt = newWayPt;
+      newWayPt = this->td_.trajectory.poses[i];
+      size_t j = 0;
+      Eigen::Vector3d direction = Eigen::Vector3d(newWayPt.pose.position.x - lastWayPt.pose.position.x, 
+                                            newWayPt.pose.position.y - lastWayPt.pose.position.y,
+                                            newWayPt.pose.position.z - lastWayPt.pose.position.z);
+      double dist = direction.norm();
+      direction /= dist;
+      double v = 0.1; // incremental posistion
+      while (ros::ok() and v*j<dist){
+        currTarget.pose.position.x = lastWayPt.pose.position.x + v*j*direction(0);
+        currTarget.pose.position.y = lastWayPt.pose.position.y + v*j*direction(1);
+        currTarget.pose.position.z = lastWayPt.pose.position.z + v*j*direction(2);
+        currTarget.pose.orientation = this->odom_.pose.pose.orientation;
+        this->updateTarget(currTarget);
+        ++j;
+        r.sleep();
+      }
+      ++i;
+		}
+    this->replan_ = false;
   }
 }
 

@@ -145,11 +145,17 @@ public:
     }
   }
 
+
+  // void setStackedCloud(pcl::PointCloud<pcl::PointXYZ>& input_cloud){
+  //   // stacked_cloud_->cloud_ = input_cloud;
+  //   pcl::copyPointCloud(input_cloud, *(stacked_cloud_->cloud_));
+  // }
+
   template <class PCLPointType>
   void UpdateKeyposeCloud(typename pcl::PointCloud<PCLPointType>::Ptr& keypose_cloud)
   {
     if (keypose_cloud->points.empty())
-    {
+    { 
       ROS_WARN("PlanningEnv::UpdateKeyposeCloud(): keypose cloud empty");
       return;
     }
@@ -191,7 +197,7 @@ public:
       {
         point.r = 255;
       }
-      *(stacked_cloud_->cloud_) += *(keypose_cloud_->cloud_);
+      // *(stacked_cloud_->cloud_) += *(keypose_cloud_->cloud_);
       stacked_cloud_downsizer_.Downsize(stacked_cloud_->cloud_, parameters_.kSurfaceCloudDwzLeafSize,
                                         parameters_.kSurfaceCloudDwzLeafSize, parameters_.kSurfaceCloudDwzLeafSize);
       for (const auto& point : stacked_cloud_->cloud_->points)
@@ -208,13 +214,13 @@ public:
       keypose_cloud_stack_[keypose_cloud_count_]->clear();
       *keypose_cloud_stack_[keypose_cloud_count_] = *keypose_cloud_->cloud_;
       keypose_cloud_count_ = (keypose_cloud_count_ + 1) % parameters_.kKeyposeCloudStackNum;
-      stacked_cloud_->cloud_->clear();
-      for (int i = 0; i < parameters_.kKeyposeCloudStackNum; i++)
-      {
-        *(stacked_cloud_->cloud_) += *keypose_cloud_stack_[i];
-      }
-      stacked_cloud_downsizer_.Downsize(stacked_cloud_->cloud_, parameters_.kSurfaceCloudDwzLeafSize,
-                                        parameters_.kSurfaceCloudDwzLeafSize, parameters_.kSurfaceCloudDwzLeafSize);
+      // stacked_cloud_->cloud_->clear();
+      // for (int i = 0; i < parameters_.kKeyposeCloudStackNum; i++)
+      // {
+      //   *(stacked_cloud_->cloud_) += *keypose_cloud_stack_[i];
+      // }
+      // stacked_cloud_downsizer_.Downsize(stacked_cloud_->cloud_, parameters_.kSurfaceCloudDwzLeafSize,
+      //                                   parameters_.kSurfaceCloudDwzLeafSize, parameters_.kSurfaceCloudDwzLeafSize);
 
       vertical_surface_cloud_stack_[keypose_cloud_count_]->clear();
       *vertical_surface_cloud_stack_[keypose_cloud_count_] = *(vertical_surface_cloud_->cloud_);

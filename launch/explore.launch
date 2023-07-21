@@ -4,6 +4,7 @@
     <arg name="rosbag_record" default="false"/>
     <arg name="bag_path" default="Desktop"/>
     <arg name="bag_name_prefix" default="tare"/>
+    
 
     <!-- <group if="$(arg rviz)">
         <node launch-prefix="nice" pkg="rviz" type="rviz" name="tare_planner_ground_rviz" args="-d $(find tare_planner)/rviz/tare_planner_ground.rviz" respawn="true"/>
@@ -16,8 +17,11 @@
         </include>
     </group>
 
-    <node pkg="tare_planner" type="tare_planner_node" name="tare_planner_node" output="screen" ns="sensor_coverage_planner">
+    <rosparam file="$(find tare_planner)/config/dynamic_map_param.yaml" ns="/dynamic_map" />
+    <!-- <node pkg="tare_planner" type="tare_planner_node" name="tare_planner_node" output="screen" ns="sensor_coverage_planner"> -->
+    <node pkg="tare_planner" type="tare_planner_node" name="tare_planner_node" output="screen" >
         <rosparam command="load" file="$(find tare_planner)/config/$(arg scenario).yaml" />
+        <!-- <rosparam command="load" file="$(find tare_planner)/config/dynamic_map_param.yaml" /> -->
     </node>
 
 </launch>

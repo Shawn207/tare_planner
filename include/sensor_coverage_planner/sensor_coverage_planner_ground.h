@@ -50,6 +50,7 @@
 #include "tare_visualizer/tare_visualizer.h"
 #include "rolling_occupancy_grid/rolling_occupancy_grid.h"
 #include "flightBase/flightBase.h"
+#include <map_manager/dynamicMap.h>
 
 #define cursup "\033[A"
 #define cursclean "\033[2K"
@@ -181,10 +182,12 @@ private:
   bool use_momentum_;
   bool lookahead_point_in_line_of_sight_;
   bool replan_;
+  bool trajCollision_;
   PlannerParameters pp_;
   PlannerData pd_;
   pointcloud_utils_ns::PointCloudDownsizer<pcl::PointXYZ> pointcloud_downsizer_;
   trajData td_;
+  std::shared_ptr<mapManager::dynamicMap> map_;
 
   int update_representation_runtime_;
   int local_viewpoint_sampling_runtime_;
@@ -197,6 +200,8 @@ private:
   int direction_change_count_;
   int direction_no_change_count_;
   int momentum_activation_count_;
+
+  std::vector<geometry_msgs::PoseStamped> trajPoints_;
 
   ros::Time start_time_;
   ros::Time replan_start_time_;

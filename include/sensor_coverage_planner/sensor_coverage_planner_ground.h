@@ -210,6 +210,7 @@ private:
   ros::Timer execution_timer_; // execute planner
   ros::Timer trajExeTimer_; // execute trajectory by publishing target pose
   ros::Timer visTimer_;
+  ros::Timer checkVisitTimer_; // timer to check if view points are visited
 
   // ROS subscribers
   ros::Subscriber exploration_start_sub_;
@@ -248,6 +249,7 @@ private:
   void NogoBoundaryCallback(const geometry_msgs::PolygonStampedConstPtr& polygon_msg);
   void trajExeCallback(const ros::TimerEvent&);
   void visTimerCallback(const ros::TimerEvent&);
+  void checkVisitCallback(const ros::TimerEvent&);
 
   void SendInitialWaypoint();
   void UpdateKeyposeGraph();

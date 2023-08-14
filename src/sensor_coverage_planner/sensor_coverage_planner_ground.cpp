@@ -13,6 +13,8 @@
 #include "graph/graph.h"
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
+#include <math.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
 namespace sensor_coverage_planner_3d_ns
 {
@@ -156,24 +158,24 @@ namespace sensor_coverage_planner_3d_ns
   }
 
   SensorCoveragePlanner3D::SensorCoveragePlanner3D(ros::NodeHandle &nh, ros::NodeHandle &nh_p)
-      : flightBase(nh), 
+      : flightBase(nh),
         keypose_cloud_update_(false),
         initialized_(false),
         lookahead_point_update_(false),
         relocation_(false), start_exploration_(false),
         exploration_finished_(false), near_home_(false),
-        at_home_(false), 
-        stopped_(false), 
-        test_point_update_(false), 
+        at_home_(false),
+        stopped_(false),
+        test_point_update_(false),
         viewpoint_ind_update_(false), step_(false),
-        use_momentum_(false), 
-        lookahead_point_in_line_of_sight_(true), 
-        replan_(true), 
+        use_momentum_(false),
+        lookahead_point_in_line_of_sight_(true),
+        replan_(true),
         trajCollision_(false),
-        registered_cloud_count_(0), 
-        keypose_count_(0), 
-        direction_change_count_(0), 
-        direction_no_change_count_(0), 
+        registered_cloud_count_(0),
+        keypose_count_(0),
+        direction_change_count_(0),
+        direction_no_change_count_(0),
         momentum_activation_count_(0)
   {
     ROS_INFO("initialized planner");
@@ -239,19 +241,26 @@ namespace sensor_coverage_planner_3d_ns
     //   i++;
     //   rate.sleep();
     // }
-		// std::cin.clear();
-		// fflush(stdin);
-		// std::cin.get();
+    // std::cin.clear();
+    // fflush(stdin);
+    // std::cin.get();
 
     // planner timer
     execution_timer_ = nh.createTimer(ros::Duration(1.0), &SensorCoveragePlanner3D::execute, this);
     // trajectory execution timer
     trajExeTimer_ = nh.createTimer(ros::Duration(0.03), &SensorCoveragePlanner3D::trajExeCallback, this);
     visTimer_ = nh.createTimer(ros::Duration(0.03), &SensorCoveragePlanner3D::visTimerCallback, this);
+    checkVisitTimer_ = nh.createTimer(ros::Duration(1.0), &SensorCoveragePlanner3D::checkVisitCallback, this);
 
     this->takeoff();
 
     return true;
+  }
+
+  void SensorCoveragePlanner3D::checkVisitCallback(const ros::TimerEvent&){
+    UpdateVisitedPositions();
+    pd_.viewpoint_manager_->UpdateViewPointVisited(pd_.visited_positions_);
+    pd_.viewpoint_manager_->UpdateViewPointVisited(pd_.grid_world_);
   }
 
   void SensorCoveragePlanner3D::visTimerCallback(const ros::TimerEvent &)
@@ -309,29 +318,8 @@ namespace sensor_coverage_planner_3d_ns
       Eigen::Vector3d p(this->trajPoints_[i].pose.position.x,
                         this->trajPoints_[i].pose.position.y,
                         this->trajPoints_[i].pose.position.z);
-      if (i%20==0){
-        std::cout << "point #" << i << " : " << p(0) << " " << p(1) << " " << p(2) << std::endl;
-        std::cout << "min: " << this->map_->localBoundMin_(0) << ", " <<this->map_->localBoundMin_(1) << ", " <<  this->map_->localBoundMin_(2) << " " << std::endl;
-        std::cout << "max: " << this->map_->localBoundMax_(0) << ", " <<this->map_->localBoundMax_(1) << ", " <<  this->map_->localBoundMax_(2) << " " << std::endl;
-        Eigen::Vector3i idx;
-        this->map_->posToIndex(p,idx);
-        std::cout << "piont index: " << idx(0) << " " << idx(1) << " " << idx(2) << std::endl;
-        int add;
-        add = this->map_->indexToAddress(idx);
-        std::cout << "point address: " << add << std::endl;
-      }
       if (this->map_->isInflatedOccupied(p))
       {
-        // this->replan_ = true;
-        std::cout << "min: " << this->map_->localBoundMin_(0) << ", " <<this->map_->localBoundMin_(1) << ", " <<  this->map_->localBoundMin_(2) << " " << std::endl;
-        std::cout << "max: " << this->map_->localBoundMax_(0) << ", " <<this->map_->localBoundMax_(1) << ", " <<  this->map_->localBoundMax_(2) << " " << std::endl;
-        Eigen::Vector3i idx;
-        this->map_->posToIndex(p,idx);
-        std::cout << "piont index: " << idx(0) << " " << idx(1) << " " << idx(2) << std::endl;
-        int add;
-        add = this->map_->indexToAddress(idx);
-        std::cout << "point address: " << add << std::endl;
-
         this->trajCollision_ = true;
         ROS_INFO("planned trajectory has collision! need replan");
         std::cout << p(0) << " " << p(1) << " " << p(2) << std::endl;
@@ -378,6 +366,7 @@ namespace sensor_coverage_planner_3d_ns
     }
     double roll, pitch, yaw;
     geometry_msgs::Quaternion geo_quat = state_estimation_msg->pose.pose.orientation;
+
     tf::Matrix3x3(tf::Quaternion(geo_quat.x, geo_quat.y, geo_quat.z, geo_quat.w)).getRPY(roll, pitch, yaw);
 
     pd_.robot_yaw_ = yaw;
@@ -1387,14 +1376,14 @@ namespace sensor_coverage_planner_3d_ns
       return;
     }
 
-    if (!this->replan_)
-    {
-      ROS_INFO("no new traj replan needed.");
-      return;
-    }
+    // if (!this->replan_)
+    // {
+    //   ROS_INFO("no new traj replan needed.");
+    //   return;
+    // }
     this->replan_ = false;
     ROS_INFO("start planing a new trajectory");
-    
+
     this->trajPoints_.clear();
     // // take off
     // this->takeoff();
@@ -1485,8 +1474,8 @@ namespace sensor_coverage_planner_3d_ns
       }
 
       pd_.exploration_path_ = ConcatenateGlobalLocalPath(global_path, local_path);
-
-      
+      std::cout << "robot position when the path is calculated: " << std::endl;
+      std::cout << pd_.robot_position_ << std::endl;
 
       PublishExplorationState();
 
@@ -1508,13 +1497,15 @@ namespace sensor_coverage_planner_3d_ns
       // divide trajectory into continuous points
       this->td_.updateTrajectory(pd_.exploration_path_.GetPath());
       size_t i = 1;
+      size_t k = 0;
+      size_t ind = -1;
       geometry_msgs::PoseStamped lastWayPt;
       geometry_msgs::PoseStamped newWayPt = this->td_.trajectory.poses[0];
       geometry_msgs::PoseStamped currTarget;
       this->trajPoints_.clear();
+      double minDist = 10;
       while (i < this->td_.trajectory.poses.size())
       {
-        // std::cout << this->td_.trajectory.poses[i].pose.position.x << " " << this->td_.trajectory.poses[i].pose.position.y << std::endl;
         lastWayPt = newWayPt;
         newWayPt = this->td_.trajectory.poses[i];
         size_t j = 0;
@@ -1524,39 +1515,69 @@ namespace sensor_coverage_planner_3d_ns
         double dist = direction.norm();
         direction /= dist;
         double v = 0.05; // incremental posistion
+
+        // drone always face forward
+        int sign = direction(1) > 0 ? 1 : -1;
+        double yaw = atan2(direction(1), direction(0));
+        geometry_msgs::Quaternion orientation;
+        tf2::Quaternion q;
+        q.setRPY(0.0, 0.0, yaw);
+        tf2::convert(q, orientation);
+        currTarget.pose.orientation = orientation;
+        // std::cout << direction << std::endl;
+        std::cout << "sign: " << sign << " "
+                  << "yaw: " << yaw << std::endl;
         while (v * j < dist)
         {
           currTarget.pose.position.x = lastWayPt.pose.position.x + v * j * direction(0);
           currTarget.pose.position.y = lastWayPt.pose.position.y + v * j * direction(1);
           currTarget.pose.position.z = lastWayPt.pose.position.z + v * j * direction(2);
-          currTarget.pose.orientation = this->odom_.pose.pose.orientation;
+          // currTarget.pose.orientation = this->odom_.pose.pose.orientation;
           this->trajPoints_.push_back(currTarget);
           ++j;
+          double dist = sqrt( pow(currTarget.pose.position.x-pd_.robot_position_.x,2) +  
+                              pow(currTarget.pose.position.y-pd_.robot_position_.y,2) +  
+                              pow(currTarget.pose.position.z-pd_.robot_position_.z,2));
+          if (dist < minDist){
+            minDist = dist;
+            ind = k;
+          }
+          ++k;
         }
         ++i;
       }
       ROS_INFO("trajectory poses generated");
 
+      ROS_INFO("Trajectory Ready. Then PRESS ENTER to start or PRESS CTRL+C to land.");
+      std::cin.clear();
+      fflush(stdin);
+      std::cin.get();
+
       // execute trajectory
+      this->trajCollision_ = false;
       this->replan_start_time_ = ros::Time::now();
       ros::Rate r(30);
-      i = 0;
+      i = ind;
+      size_t j = 0;
       while (ros::ok() and i < this->trajPoints_.size())
       {
         // if (this->replan_)
         if (this->trajCollision_)
         {
           ROS_INFO("trajectory execution interrupt.");
-          // ros::spinOnce();
-          // break;
-          i = this->trajPoints_.size();
+          // this->replan_ = true;
+          break;
+          // i = this->trajPoints_.size();
         }
-        else{
-          this->updateTarget(this->trajPoints_[i]);
-          ++i;
-          
-        }
-        ROS_INFO("spin");
+        // if(j%10==0){
+        //   UpdateVisitedPositions();
+        //   pd_.viewpoint_manager_->UpdateViewPointVisited(pd_.visited_positions_);
+        //   pd_.viewpoint_manager_->UpdateViewPointVisited(pd_.grid_world_);
+        // }
+        // ++j;
+        this->updateTarget(this->trajPoints_[i]);
+        ++i;
+        // ROS_INFO("spin");
         ros::spinOnce();
         r.sleep();
       }

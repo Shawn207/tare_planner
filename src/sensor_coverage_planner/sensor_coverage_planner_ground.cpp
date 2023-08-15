@@ -15,7 +15,7 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <math.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-
+ 
 namespace sensor_coverage_planner_3d_ns
 {
   bool PlannerParameters::ReadParameters(ros::NodeHandle &nh)
@@ -1376,17 +1376,10 @@ namespace sensor_coverage_planner_3d_ns
       return;
     }
 
-    // if (!this->replan_)
-    // {
-    //   ROS_INFO("no new traj replan needed.");
-    //   return;
-    // }
     this->replan_ = false;
     ROS_INFO("start planing a new trajectory");
 
     this->trajPoints_.clear();
-    // // take off
-    // this->takeoff();
 
     Timer overall_processing_timer("overall processing");
     update_representation_runtime_ = 0;
@@ -1460,11 +1453,11 @@ namespace sensor_coverage_planner_3d_ns
       if (pd_.grid_world_->IsReturningHome() && pd_.local_coverage_planner_->IsLocalCoverageComplete() &&
           (ros::Time::now() - start_time_).toSec() > 5)
       {
-        if (!exploration_finished_)
-        {
-          PrintExplorationStatus("Exploration completed, returning home", false);
-        }
-        exploration_finished_ = true;
+        // if (!exploration_finished_)
+        // {
+        //   PrintExplorationStatus("Exploration completed, returning home", false);
+        // }
+        // exploration_finished_ = true;
       }
 
       if (exploration_finished_ && at_home_ && !stopped_)
@@ -1474,8 +1467,6 @@ namespace sensor_coverage_planner_3d_ns
       }
 
       pd_.exploration_path_ = ConcatenateGlobalLocalPath(global_path, local_path);
-      std::cout << "robot position when the path is calculated: " << std::endl;
-      std::cout << pd_.robot_position_ << std::endl;
 
       PublishExplorationState();
 
@@ -1498,12 +1489,12 @@ namespace sensor_coverage_planner_3d_ns
       this->td_.updateTrajectory(pd_.exploration_path_.GetPath());
       size_t i = 1;
       size_t k = 0;
-      size_t ind = -1;
+      size_t ind = INT_MAX;
       geometry_msgs::PoseStamped lastWayPt;
       geometry_msgs::PoseStamped newWayPt = this->td_.trajectory.poses[0];
       geometry_msgs::PoseStamped currTarget;
       this->trajPoints_.clear();
-      double minDist = 10;
+      double distTresh = 1.0;
       while (i < this->td_.trajectory.poses.size())
       {
         lastWayPt = newWayPt;
@@ -1514,7 +1505,7 @@ namespace sensor_coverage_planner_3d_ns
                                                     newWayPt.pose.position.z - lastWayPt.pose.position.z);
         double dist = direction.norm();
         direction /= dist;
-        double v = 0.05; // incremental posistion
+        double v = 0.03; // incremental posistion
 
         // drone always face forward
         int sign = direction(1) > 0 ? 1 : -1;
@@ -1524,22 +1515,17 @@ namespace sensor_coverage_planner_3d_ns
         q.setRPY(0.0, 0.0, yaw);
         tf2::convert(q, orientation);
         currTarget.pose.orientation = orientation;
-        // std::cout << direction << std::endl;
-        std::cout << "sign: " << sign << " "
-                  << "yaw: " << yaw << std::endl;
         while (v * j < dist)
         {
           currTarget.pose.position.x = lastWayPt.pose.position.x + v * j * direction(0);
           currTarget.pose.position.y = lastWayPt.pose.position.y + v * j * direction(1);
           currTarget.pose.position.z = lastWayPt.pose.position.z + v * j * direction(2);
-          // currTarget.pose.orientation = this->odom_.pose.pose.orientation;
           this->trajPoints_.push_back(currTarget);
           ++j;
-          double dist = sqrt( pow(currTarget.pose.position.x-pd_.robot_position_.x,2) +  
+          double dist2Robot = sqrt( pow(currTarget.pose.position.x-pd_.robot_position_.x,2) +  
                               pow(currTarget.pose.position.y-pd_.robot_position_.y,2) +  
                               pow(currTarget.pose.position.z-pd_.robot_position_.z,2));
-          if (dist < minDist){
-            minDist = dist;
+          if (dist2Robot < distTresh && k<ind){
             ind = k;
           }
           ++k;
@@ -1548,36 +1534,27 @@ namespace sensor_coverage_planner_3d_ns
       }
       ROS_INFO("trajectory poses generated");
 
-      ROS_INFO("Trajectory Ready. Then PRESS ENTER to start or PRESS CTRL+C to land.");
-      std::cin.clear();
-      fflush(stdin);
-      std::cin.get();
+      // ROS_INFO("Trajectory Ready. Then PRESS ENTER to start or PRESS CTRL+C to land.");
+      // std::cin.clear();
+      // fflush(stdin);
+      // std::cin.get();
 
       // execute trajectory
       this->trajCollision_ = false;
       this->replan_start_time_ = ros::Time::now();
       ros::Rate r(30);
-      i = ind;
+      i = ind+5;
       size_t j = 0;
       while (ros::ok() and i < this->trajPoints_.size())
       {
-        // if (this->replan_)
         if (this->trajCollision_)
         {
           ROS_INFO("trajectory execution interrupt.");
-          // this->replan_ = true;
           break;
-          // i = this->trajPoints_.size();
         }
-        // if(j%10==0){
-        //   UpdateVisitedPositions();
-        //   pd_.viewpoint_manager_->UpdateViewPointVisited(pd_.visited_positions_);
-        //   pd_.viewpoint_manager_->UpdateViewPointVisited(pd_.grid_world_);
-        // }
-        // ++j;
+
         this->updateTarget(this->trajPoints_[i]);
         ++i;
-        // ROS_INFO("spin");
         ros::spinOnce();
         r.sleep();
       }

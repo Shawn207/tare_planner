@@ -60,20 +60,22 @@ void LocalCoveragePlanner::GetBoundaryViewpointIndices(exploration_path_ns::Expl
 }
 
 void LocalCoveragePlanner::GetNavigationViewPointIndices(exploration_path_ns::ExplorationPath global_path,
-                                                         std::vector<int>& navigation_viewpoint_indices)
+                                                         std::vector<int>& navigation_viewpoint_indices
+                                                        )
 {
   // Get start and end point
   robot_viewpoint_ind_ = viewpoint_manager_->GetNearestCandidateViewPointInd(robot_position_);
   lookahead_viewpoint_ind_ = viewpoint_manager_->GetNearestCandidateViewPointInd(lookahead_point_);
-  ROS_INFO("robot and lookahead point position");
-  std::cout << robot_position_ << std::endl;
-  std::cout << lookahead_point_<<std::endl;
+  // ROS_INFO("robot and lookahead point position");
+  // std::cout << robot_position_ << std::endl;
+  // std::cout << lookahead_point_<<std::endl;
   geometry_msgs::Point curr_position;
   curr_position.x = robot_position_(0);
   curr_position.y = robot_position_(1);
   curr_position.z = robot_position_(2);
   // viewpoint_manager_->SetViewPointPosition(start_viewpoint_ind_, curr_position);
   // std::cout << "new robot start position: "<< std::endl;
+  
   std::cout << viewpoint_manager_->GetViewPointPosition(start_viewpoint_ind_) << std::endl;
   if (!lookahead_point_update_ || !viewpoint_manager_->InRange(lookahead_viewpoint_ind_))
   {
@@ -84,31 +86,20 @@ void LocalCoveragePlanner::GetNavigationViewPointIndices(exploration_path_ns::Ex
 
   // Update the coverage with viewpoints that must visit
 
+
   navigation_viewpoint_indices.push_back(start_viewpoint_ind_);
-
   navigation_viewpoint_indices.push_back(end_viewpoint_ind_);
-
-  if (!viewpoint_manager_->ViewPointVisited(robot_viewpoint_ind_)){
-    navigation_viewpoint_indices.push_back(robot_viewpoint_ind_);
-  }
-  else {
-    std::cout << "robot viewpoint visited" << std::endl;
-  }
-  
-  if (!viewpoint_manager_->ViewPointVisited(lookahead_viewpoint_ind_)){
-    navigation_viewpoint_indices.push_back(lookahead_viewpoint_ind_);
-  }
-  else {
-    std::cout << "lookahead viewpoint visited" << std::endl;
-  }
+  navigation_viewpoint_indices.push_back(robot_viewpoint_ind_);
+  navigation_viewpoint_indices.push_back(lookahead_viewpoint_ind_);
   // navigation_viewpoint_indices.push_back(end_viewpoint_ind_);
   // navigation_viewpoint_indices.push_back(robot_viewpoint_ind_);
   // navigation_viewpoint_indices.push_back(lookahead_viewpoint_ind_);
-  ROS_INFO("navigation viewpoint positions: ");
-  std::cout << viewpoint_manager_->GetViewPointPosition(start_viewpoint_ind_) << std::endl;
-  std::cout << viewpoint_manager_->GetViewPointPosition(end_viewpoint_ind_) << std::endl;
-  std::cout << viewpoint_manager_->GetViewPointPosition(robot_viewpoint_ind_) << std::endl;
-  std::cout << viewpoint_manager_->GetViewPointPosition(lookahead_viewpoint_ind_) << std::endl;
+  // ROS_INFO("navigation viewpoint positions: ");
+  // std::cout << "start" << viewpoint_manager_->GetViewPointPosition(start_viewpoint_ind_) << std::endl;
+  
+  // std::cout << "end" <<viewpoint_manager_->GetViewPointPosition(end_viewpoint_ind_) << std::endl;
+  // std::cout << "robot" << viewpoint_manager_->GetViewPointPosition(robot_viewpoint_ind_) << std::endl;
+  // std::cout << "lookahead" << viewpoint_manager_->GetViewPointPosition(lookahead_viewpoint_ind_) << std::endl;
 }
 
 void LocalCoveragePlanner::UpdateViewPointCoveredPoint(std::vector<bool>& point_list, int viewpoint_index,
@@ -565,12 +556,6 @@ exploration_path_ns::ExplorationPath LocalCoveragePlanner::SolveTSP(const std::v
       cur_ind = selected_viewpoint_indices[path_index[i]];
       next_ind = selected_viewpoint_indices[path_index[i + 1]];
 
-      //   from_graph_idx = graph_index_map_[cur_ind];
-      //   to_graph_idx = graph_index_map_[next_ind];
-
-      // Add viewpoint node
-      // int cur_array_ind = grid_->GetArrayInd(cur_ind);
-      // geometry_msgs::Point cur_node_position = viewpoints_[cur_array_ind].GetPosition();
       geometry_msgs::Point cur_node_position = viewpoint_manager_->GetViewPointPosition(cur_ind);
       exploration_path_ns::Node cur_node(cur_node_position, exploration_path_ns::NodeType::LOCAL_VIEWPOINT);
       cur_node.local_viewpoint_ind_ = cur_ind;
@@ -604,26 +589,13 @@ exploration_path_ns::ExplorationPath LocalCoveragePlanner::SolveTSP(const std::v
 
       nav_msgs::Path path_between_viewpoints = viewpoint_manager_->GetViewPointShortestPath(cur_ind, next_ind);
 
-      //   std::vector<int> path_graph_indices;
-      //   misc_utils_ns::AStarSearch(candidate_viewpoint_graph_, candidate_viewpoint_dist_,
-      //   candidate_viewpoint_position_,
-      //                              from_graph_idx, to_graph_idx, true, path_graph_indices);
-      // Add viapoint nodes;
-      //   if (path_graph_indices.size() > 2)
       if (path_between_viewpoints.poses.size() > 2)
       {
-        // for (int j = 1; j < path_graph_indices.size() - 1; j++)
         for (int j = 1; j < path_between_viewpoints.poses.size() - 1; j++)
         {
-          //   int graph_idx = path_graph_indices[j];
-          //   int ind = candidate_indices_[graph_idx];
           exploration_path_ns::Node node;
           node.type_ = exploration_path_ns::NodeType::LOCAL_VIA_POINT;
           node.local_viewpoint_ind_ = -1;
-          //   geometry_msgs::Point node_position = viewpoint_manager_->GetViewPointPosition(ind);
-          //   node.position_.x() = node_position.x;
-          //   node.position_.y() = node_position.y;
-          //   node.position_.z() = node_position.z;
           node.position_.x() = path_between_viewpoints.poses[j].pose.position.x;
           node.position_.y() = path_between_viewpoints.poses[j].pose.position.y;
           node.position_.z() = path_between_viewpoints.poses[j].pose.position.z;
@@ -697,8 +669,6 @@ exploration_path_ns::ExplorationPath LocalCoveragePlanner::SolveLocalCoveragePro
     if (covered_point_num >= parameters_.kMinAddPointNum)
     {
       reused_viewpoint_indices.push_back(viewpoint_manager_->GetViewPointInd(viewpoint_array_ind));
-      std::cout << " add point from last cycle: " << std::endl;
-      std::cout << viewpoint_manager_->GetViewPointPosition(viewpoint_array_ind) << std::endl;
     }
     else if (use_frontier_)
     {
@@ -707,8 +677,6 @@ exploration_path_ns::ExplorationPath LocalCoveragePlanner::SolveLocalCoveragePro
       if (covered_frontier_point_num >= parameters_.kMinAddFrontierPointNum)
       {
         reused_viewpoint_indices.push_back(viewpoint_manager_->GetViewPointInd(viewpoint_array_ind));
-        std::cout << " add point from last cycle: " << std::endl;
-        std::cout << viewpoint_manager_->GetViewPointInd(viewpoint_array_ind) << std::endl;
       }
     }
   }
@@ -781,7 +749,7 @@ exploration_path_ns::ExplorationPath LocalCoveragePlanner::SolveLocalCoveragePro
       if (!local_path_itr.nodes_.empty() && path_length < min_path_length)
 
       {
-        ROS_INFO("use order");
+        // ROS_INFO("use order");
         min_path_length = path_length;
         local_path = local_path_itr;
         last_selected_viewpoint_indices_ = ordered_viewpoint_indices;
@@ -822,7 +790,7 @@ exploration_path_ns::ExplorationPath LocalCoveragePlanner::SolveLocalCoveragePro
     local_path = SolveTSP(selected_viewpoint_indices_itr, ordered_viewpoint_indices);
 
     last_selected_viewpoint_indices_ = ordered_viewpoint_indices;
-    ROS_INFO("use order");
+    // ROS_INFO("use order");
   }
 
   last_selected_viewpoint_array_indices_.clear();
@@ -837,7 +805,7 @@ exploration_path_ns::ExplorationPath LocalCoveragePlanner::SolveLocalCoveragePro
   {
     viewpoint_manager_->SetViewPointSelected(i, false, true);
   }
-  ROS_INFO("last selected vp:");
+  // ROS_INFO("last selected vp:");
   for (const auto& viewpoint_index : last_selected_viewpoint_indices_)
   {
     if (viewpoint_index != robot_viewpoint_ind_ && viewpoint_index != start_viewpoint_ind_ &&
@@ -846,7 +814,7 @@ exploration_path_ns::ExplorationPath LocalCoveragePlanner::SolveLocalCoveragePro
       viewpoint_manager_->SetViewPointSelected(viewpoint_index, true);
     }
 
-    std::cout << viewpoint_manager_->GetViewPointPosition(viewpoint_index) << std::endl;
+    // std::cout << viewpoint_manager_->GetViewPointPosition(viewpoint_index) << std::endl;
   }
   return local_path;
 }

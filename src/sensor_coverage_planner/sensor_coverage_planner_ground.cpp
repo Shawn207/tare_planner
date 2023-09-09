@@ -1489,7 +1489,7 @@ namespace sensor_coverage_planner_3d_ns
       this->td_.updateTrajectory(pd_.exploration_path_.GetPath());
       size_t i = 1;
       size_t k = 0;
-      size_t ind = INT_MAX;
+      size_t ind = 10000;
       geometry_msgs::PoseStamped lastWayPt;
       geometry_msgs::PoseStamped newWayPt = this->td_.trajectory.poses[0];
       geometry_msgs::PoseStamped currTarget;
@@ -1505,7 +1505,7 @@ namespace sensor_coverage_planner_3d_ns
                                                     newWayPt.pose.position.z - lastWayPt.pose.position.z);
         double dist = direction.norm();
         direction /= dist;
-        double v = 0.03; // incremental posistion
+        double v = 0.065; // incremental posistion
 
         // drone always face forward
         int sign = direction(1) > 0 ? 1 : -1;
@@ -1543,7 +1543,7 @@ namespace sensor_coverage_planner_3d_ns
       this->trajCollision_ = false;
       this->replan_start_time_ = ros::Time::now();
       ros::Rate r(30);
-      i = ind+5;
+      i = ind+10;
       size_t j = 0;
       while (ros::ok() and i < this->trajPoints_.size())
       {

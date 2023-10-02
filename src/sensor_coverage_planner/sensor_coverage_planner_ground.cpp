@@ -58,7 +58,7 @@ namespace sensor_coverage_planner_3d_ns
     kRushHomeDist = misc_utils_ns::getParam<double>(nh, "kRushHomeDist", 10.0);
     kAtHomeDistThreshold = misc_utils_ns::getParam<double>(nh, "kAtHomeDistThreshold", 0.5);
     kTerrainCollisionThreshold = misc_utils_ns::getParam<double>(nh, "kTerrainCollisionThreshold", 0.5);
-    kLookAheadDistance = misc_utils_ns::getParam<double>(nh, "kLookAheadDistance", 5.0);
+    kLookAheadDistance = misc_utils_ns::getParam<double>(nh, "kLookAheadDistance", 10.0);
     kExtendWayPointDistanceBig = misc_utils_ns::getParam<double>(nh, "kExtendWayPointDistanceBig", 8.0);
     kExtendWayPointDistanceSmall = misc_utils_ns::getParam<double>(nh, "kExtendWayPointDistanceSmall", 3.0);
 
@@ -1505,7 +1505,7 @@ namespace sensor_coverage_planner_3d_ns
                                                     newWayPt.pose.position.z - lastWayPt.pose.position.z);
         double dist = direction.norm();
         direction /= dist;
-        double v = 0.065; // incremental posistion
+        double v = 0.05; // incremental posistion
 
         // drone always face forward
         int sign = direction(1) > 0 ? 1 : -1;
@@ -1543,7 +1543,7 @@ namespace sensor_coverage_planner_3d_ns
       this->trajCollision_ = false;
       this->replan_start_time_ = ros::Time::now();
       ros::Rate r(30);
-      i = ind+10;
+      i = ind+15;
       size_t j = 0;
       while (ros::ok() and i < this->trajPoints_.size())
       {

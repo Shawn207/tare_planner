@@ -18,7 +18,7 @@ pose_topic: /CERLAB/quadcopter/pose
 odom_topic: /CERLAB/quadcopter/odom
 
 # robot size
-robot_size: [0.5, 0.5, 0.3]
+robot_size: [0.3, 0.3, 0.2]
 
 # Camera Parameters
 # depth_intrinsics: [386.22674560546875, 386.22674560546875, 317.3930969238281, 239.78431701660156] # fx,  fy, cx, cy realsense
@@ -48,7 +48,7 @@ p_occ: 0.80
 # Map
 map_resolution: 0.1
 ground_height: -0.1 # m
-map_size: [80, 50, 3 ] # meter. in x y z direction (reserved size)
+map_size: [100, 25, 3 ] # meter. in x y z direction (reserved size)
 local_update_range: [5, 5, 3]
 local_bound_inflation: 3.0 # inflate local bound in meter
 clean_local_map: false
@@ -90,7 +90,7 @@ ground_thickness: 0.0 # thickness of ground
 timestep: 0.033 # system time step
 overlap_threshold: 0.3 # overlap ratio for tracking metric
 continuity_thresh: 0.8 # threshold of average cosine value in continuity filter
-velocity_threshold: 0.4 # larger than this value will be considered as dynamic obstacle
+velocity_threshold: 11 #0.4 # larger than this value will be considered as dynamic obstacle
 
 # track and identify dynamic
 fov_x_margin: 3

@@ -387,6 +387,8 @@ int ViewPointManager::GetViewPointInd(Eigen::Vector3d position)
 void ViewPointManager::GetVisualizationCloud(pcl::PointCloud<pcl::PointXYZI>::Ptr& vis_cloud)
 {
   vis_cloud->clear();
+  ROS_INFO("============ kVPNumber: %i",vp_.kViewPointNumber);
+  int k = 0;
   for (int i = 0; i < vp_.kViewPointNumber; i++)
   {
     if (IsViewPointCandidate(i, true))
@@ -414,6 +416,10 @@ void ViewPointManager::GetVisualizationCloud(pcl::PointCloud<pcl::PointXYZI>::Pt
       //   vis_point.intensity = -1;
       // }
       vis_cloud->points.push_back(vis_point);
+      ++k;
+    }
+    if (i==vp_.kViewPointNumber-1){
+      ROS_INFO("===========size pc=%i",k);
     }
   }
 }
@@ -560,6 +566,7 @@ void ViewPointManager::CheckViewPointLineOfSightHelper(const Eigen::Vector3i& st
               GetViewPointCollisionFrameCount(viewpoint_ind) > vp_.kCollisionFrameCountMax)
 
           {
+            printf("collisioncount: %i",GetViewPointCollisionFrameCount(viewpoint_ind));
             SetViewPointCollision(viewpoint_ind, false);
           }
         }
@@ -812,10 +819,14 @@ void ViewPointManager::CheckViewPointConnectivity()
   std::list<int> queue;
   queue.push_back(robot_ind);
   int connected_viewpoint_count = 1;
+
+  int s=0;
+  int t=0;
   while (!queue.empty())
   {
     int cur_ind = queue.front();
     queue.pop_front();
+    // printf("conected neighbors: %i",connected_neighbor_indices_[cur_ind].size() );
     for (int i = 0; i < connected_neighbor_indices_[cur_ind].size(); i++)
     {
       int neighbor_ind = connected_neighbor_indices_[cur_ind][i];
@@ -824,18 +835,30 @@ void ViewPointManager::CheckViewPointConnectivity()
         std::cout << "ViewPointManager::CheckViewPointConnectivity: neighbor ind out of bound" << std::endl;
         continue;
       }
+      if (ViewPointInCollision(neighbor_ind)){
+        s++;
+      }
+      if (!ViewPointInLineOfSight(neighbor_ind)){
+        t++;
+      }
+
       if (!checked[neighbor_ind] && !ViewPointInCollision(neighbor_ind) && ViewPointInLineOfSight(neighbor_ind))
+      // if (!checked[neighbor_ind] && ViewPointInLineOfSight(neighbor_ind)) //???
       {
-        if (std::abs(GetViewPointHeight(cur_ind) - GetViewPointHeight(neighbor_ind)) < vp_.kConnectivityHeightDiffThr)
+        // if (std::abs(GetViewPointHeight(cur_ind) - GetViewPointHeight(neighbor_ind)) < vp_.kConnectivityHeightDiffThr)
+        if (true) //??
         {
           SetViewPointConnected(neighbor_ind, true);
           connected_viewpoint_count++;
           queue.push_back(neighbor_ind);
         }
       }
+      // queue.push_back(neighbor_ind);
       checked[neighbor_ind] = true;
     }
   }
+  ROS_INFO("+++++++ connectivity: collision issue %i",s);
+  ROS_INFO("+++++++ connectivity: lineofsight issue %i",t);
 }
 
 void ViewPointManager::UpdateViewPointVisited(const std::vector<Eigen::Vector3d>& positions)
@@ -1223,10 +1246,19 @@ int ViewPointManager::GetViewPointCandidate()
   viewpoint_candidate_cloud_->clear();
   viewpoint_in_collision_cloud_->clear();
   candidate_indices_.clear();
+  int s = 0;
+  int t = 0;
   for (int i = 0; i < vp_.kViewPointNumber; i++)
   {
+    if (!ViewPointInLineOfSight(i)){
+      s++;
+    }
+    if (!ViewPointConnected(i)){
+      t++;
+    }
     SetViewPointCandidate(i, false);
-    if (!ViewPointInCollision(i) && ViewPointInLineOfSight(i) && ViewPointConnected(i))
+    // if (!ViewPointInCollision(i) && ViewPointInLineOfSight(i) && ViewPointConnected(i))
+    if (!ViewPointInCollision(i) && ViewPointConnected(i)) // ???
     {
       SetViewPointCandidate(i, true);
       candidate_indices_.push_back(i);
@@ -1248,6 +1280,8 @@ int ViewPointManager::GetViewPointCandidate()
       viewpoint_in_collision_cloud_->points.push_back(point);
     }
   }
+  ROS_INFO("-------------- line of sight issue: %i",s);
+  ROS_INFO("-------------- connection issue: %i",t);
   // std::cout << "candidate viewpoint num: " << candidate_indices_.size() << std::endl;
   if (!candidate_indices_.empty())
   {

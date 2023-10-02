@@ -25,7 +25,7 @@ bool LocalCoveragePlannerParameter::ReadParameters(ros::NodeHandle& nh)
   return true;
 }
 LocalCoveragePlanner::LocalCoveragePlanner(ros::NodeHandle& nh)
-  : lookahead_point_update_(false), use_frontier_(true), local_coverage_complete_(false)
+  : lookahead_point_update_(true), use_frontier_(true), local_coverage_complete_(false)
 {
   parameters_.ReadParameters(nh);
 }
